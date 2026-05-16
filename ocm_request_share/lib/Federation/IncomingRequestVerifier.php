@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\OcmRequestShare\Federation;
 
+use OCP\IAppConfig;
 use OCP\Security\Signature\Exceptions\IdentityNotFoundException;
 use OCP\Security\Signature\Exceptions\IncomingRequestException;
 use OCP\Security\Signature\Exceptions\SignatoryNotFoundException;
@@ -23,10 +24,23 @@ use OCP\Security\Signature\ISignatureManager;
  * "request-share" listener can apply the same identity check that addShare
  * applies to its `owner` field — but on `shareWith` (the requester) here,
  * since that is who signs a Request-for-a-Share.
+ *
+ * Honours the three-state native NC signing policy via two booleans:
+ *   - core.ocm_signed_request_disabled = true  -> all signing checks off
+ *   - core.ocm_signed_request_enforced = true  -> handled upstream by the
+ *     catch-all OCMRequestController, unsigned requests never reach us
+ *   - both false (default, permissive) -> we apply confirmSignedOrigin logic
  */
 class IncomingRequestVerifier {
+	// Key names taken from OC\OCM\OCMSignatoryManager. We can't reference the
+	// constants directly without crossing the OC\ private namespace boundary;
+	// upstream-hoisting this verifier (see related issue) will let us drop
+	// the duplication.
+	private const APPCONFIG_SIGN_DISABLED = 'ocm_signed_request_disabled';
+
 	public function __construct(
 		private readonly ISignatureManager $signatureManager,
+		private readonly IAppConfig $appConfig,
 	) {
 	}
 
@@ -36,6 +50,10 @@ class IncomingRequestVerifier {
 	 *   host is known to support signing.
 	 */
 	public function verifyOriginMatches(?string $signedOrigin, string $ocmAddress): void {
+		if ($this->appConfig->getValueBool('core', self::APPCONFIG_SIGN_DISABLED, lazy: true)) {
+			return;
+		}
+
 		$instance = $this->getHostFromFederationId($ocmAddress);
 
 		if ($signedOrigin === null) {
