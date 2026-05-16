@@ -1,0 +1,7 @@
+/ocm_request_share/build/
+/ocm_request_share/vendor/
+/ocm_request_share/node_modules/
+/ocm_request_share/composer.lock
+/ocm_request_share/package-lock.json
+*.swp
+.DS_Store

@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 SUNET <kano@sunet.se>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+publiccodeYmlVersion: "0.4"
+
+name: ocm_request_share
+url: "https://github.com/SUNET/nextcloud-ocm_request_share"
+platforms:
+  - web
+
+categories:
+  - web-collaboration
+
+developmentStatus: development
+
+softwareType: "addon"
+
+description:
+  en:
+    shortDescription: >
+      Spec-compliant OCM Request-for-a-Share for Nextcloud, plus an
+      out-of-band public dataset registry.
+    longDescription: >
+      Implements the cs3org OCM "Request for a Share" endpoint and flow.
+      Allows a user (or remote server) to ask the owner of a resource to
+      share it. The owner accepts or declines, optionally triggering a
+      Share Creation Notification.
+    features:
+      - OCM Request-for-a-Share endpoint
+      - Outgoing share-request composer
+      - Pending-request inbox
+      - Public dataset registry (HTML / JSON / JWS)
+
+legal:
+  license: AGPL-3.0-or-later
+
+maintenance:
+  type: "community"
+  contacts:
+    - name: Micke Nordin <kano@sunet.se>
+
+localisation:
+  localisationReady: true
+  availableLanguages:
+    - en

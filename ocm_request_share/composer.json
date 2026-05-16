@@ -1,0 +1,34 @@
+{
+	"name": "sunet/ocm_request_share",
+	"description": "OCM Request-for-a-Share for Nextcloud",
+	"type": "project",
+	"license": "AGPL-3.0-or-later",
+	"authors": [
+		{ "name": "SUNET", "email": "kano@sunet.se" }
+	],
+	"autoload": {
+		"psr-4": {
+			"OCA\\OcmRequestShare\\": "lib/"
+		}
+	},
+	"require-dev": {
+		"nextcloud/ocp": "dev-master",
+		"nextcloud/coding-standard": "^1.3",
+		"phpunit/phpunit": "^10",
+		"psalm/phar": "^5"
+	},
+	"scripts": {
+		"lint": "find . -name \\*.php -not -path './vendor/*' -print0 | xargs -0 -n1 php -l",
+		"cs:check": "php-cs-fixer fix --dry-run --diff",
+		"cs:fix": "php-cs-fixer fix",
+		"psalm": "psalm.phar --threads=1"
+	},
+	"config": {
+		"allow-plugins": {
+			"composer/package-versions-deprecated": true
+		},
+		"platform": {
+			"php": "8.2"
+		}
+	}
+}
