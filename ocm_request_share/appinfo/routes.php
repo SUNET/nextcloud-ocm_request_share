@@ -7,17 +7,10 @@ declare(strict_types=1);
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+// POST /ocm/request-share is handled by listening on OCMEndpointRequestEvent
+// (dispatched by cloud_federation_api's catch-all controller), not by registering
+// our own route — see lib/Listener/OCMEndpointRequestEventListener.php.
 return [
-	'routes' => [
-		// OCM Request-for-a-Share endpoint (RFC: POST /ocm/request-share)
-		[
-			'name' => 'RequestHandler#requestShare',
-			'url' => '/ocm/request-share',
-			'verb' => 'POST',
-			'root' => '',
-			'postfix' => 'request-share',
-		],
-	],
 	'ocs' => [
 		// Outgoing: a local user asks a remote owner to share a resource.
 		[

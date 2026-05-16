@@ -10,11 +10,13 @@ declare(strict_types=1);
 namespace OCA\OcmRequestShare\AppInfo;
 
 use OCA\OcmRequestShare\Listener\LocalOCMDiscoveryEventListener;
+use OCA\OcmRequestShare\Listener\OCMEndpointRequestEventListener;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\OCM\Events\LocalOCMDiscoveryEvent;
+use OCP\OCM\Events\OCMEndpointRequestEvent;
 
 class Application extends App implements IBootstrap {
 	public const APP_ID = 'ocm_request_share';
@@ -25,6 +27,7 @@ class Application extends App implements IBootstrap {
 
 	public function register(IRegistrationContext $context): void {
 		$context->registerEventListener(LocalOCMDiscoveryEvent::class, LocalOCMDiscoveryEventListener::class);
+		$context->registerEventListener(OCMEndpointRequestEvent::class, OCMEndpointRequestEventListener::class);
 	}
 
 	public function boot(IBootContext $context): void {
