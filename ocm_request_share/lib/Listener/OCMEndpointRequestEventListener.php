@@ -11,7 +11,6 @@ namespace OCA\OcmRequestShare\Listener;
 
 use OCA\OcmRequestShare\Db\ShareRequest;
 use OCA\OcmRequestShare\Db\ShareRequestMapper;
-use OCA\OcmRequestShare\Federation\IncomingRequestVerifier;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Utility\ITimeFactory;
@@ -20,6 +19,7 @@ use OCP\EventDispatcher\IEventListener;
 use OCP\Federation\ICloudIdManager;
 use OCP\IUserManager;
 use OCP\OCM\Events\OCMEndpointRequestEvent;
+use OCP\OCM\IOCMDiscoveryService;
 use OCP\Security\Signature\Exceptions\IncomingRequestException;
 use Psr\Log\LoggerInterface;
 
@@ -35,7 +35,7 @@ class OCMEndpointRequestEventListener implements IEventListener {
 
 	public function __construct(
 		private readonly ShareRequestMapper $mapper,
-		private readonly IncomingRequestVerifier $verifier,
+		private readonly IOCMDiscoveryService $ocmDiscoveryService,
 		private readonly ICloudIdManager $cloudIdManager,
 		private readonly IUserManager $userManager,
 		private readonly ITimeFactory $timeFactory,
@@ -80,7 +80,7 @@ class OCMEndpointRequestEventListener implements IEventListener {
 		}
 
 		try {
-			$this->verifier->verifyOriginMatches($event->getRemote(), $shareWith);
+			$this->ocmDiscoveryService->confirmRequestOrigin($event->getRemote(), $shareWith);
 		} catch (IncomingRequestException $e) {
 			$this->logger->warning('rejected /ocm/request-share: signed-origin mismatch', ['exception' => $e]);
 			$event->setResponse(new JSONResponse(
