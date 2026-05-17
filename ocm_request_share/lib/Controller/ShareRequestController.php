@@ -11,19 +11,26 @@ namespace OCA\OcmRequestShare\Controller;
 
 use OCA\OcmRequestShare\Db\ShareRequest;
 use OCA\OcmRequestShare\Db\ShareRequestMapper;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\OCS\OCSBadRequestException;
 use OCP\AppFramework\OCS\OCSException;
 use OCP\AppFramework\OCS\OCSForbiddenException;
+use OCP\AppFramework\OCS\OCSNotFoundException;
 use OCP\AppFramework\OCSController;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\Constants;
 use OCP\Federation\ICloudIdManager;
+use OCP\Files\IRootFolder;
+use OCP\Files\NotFoundException;
 use OCP\IRequest;
 use OCP\OCM\Exceptions\OCMCapabilityException;
 use OCP\OCM\Exceptions\OCMProviderException;
 use OCP\OCM\IOCMDiscoveryService;
+use OCP\Share\IManager as IShareManager;
+use OCP\Share\IShare;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -48,6 +55,8 @@ class ShareRequestController extends OCSController {
 		private readonly ShareRequestMapper $mapper,
 		private readonly IOCMDiscoveryService $ocmDiscoveryService,
 		private readonly ICloudIdManager $cloudIdManager,
+		private readonly IShareManager $shareManager,
+		private readonly IRootFolder $rootFolder,
 		private readonly ITimeFactory $timeFactory,
 		private readonly LoggerInterface $logger,
 		private readonly ?string $userId,
@@ -140,6 +149,104 @@ class ShareRequestController extends OCSController {
 		$entity = $this->mapper->insert($entity);
 
 		return new DataResponse(['id' => $entity->getId()], Http::STATUS_CREATED);
+	}
+
+	/**
+	 * Local owner decides on an incoming pending request. Accepting creates
+	 * an OCM share to the requester via the standard IShare machinery —
+	 * the resulting POST to the remote /ocm/shares endpoint is the cs3org
+	 * RFC's "Share Creation Notification". Declining only flips the local
+	 * row; an explicit decline notification to the requester is left for
+	 * a follow-up (see issue tracker).
+	 *
+	 * @param int $id incoming request row id
+	 * @param string $decision "accept" or "decline"
+	 *
+	 * @return DataResponse<Http::STATUS_OK, array{id: int, status: string}, array{}>
+	 * @throws OCSBadRequestException
+	 * @throws OCSForbiddenException
+	 * @throws OCSNotFoundException
+	 *
+	 * 200: Decision recorded
+	 */
+	#[NoAdminRequired]
+	public function decide(int $id, string $decision): DataResponse {
+		if ($this->userId === null) {
+			throw new OCSForbiddenException();
+		}
+
+		try {
+			$row = $this->mapper->findById($id);
+		} catch (DoesNotExistException) {
+			throw new OCSNotFoundException();
+		}
+
+		if ($row->getDirection() !== ShareRequest::DIRECTION_INCOMING) {
+			throw new OCSBadRequestException('only incoming requests can be decided');
+		}
+		if ($row->getStatus() !== ShareRequest::STATUS_PENDING) {
+			throw new OCSBadRequestException('request is not pending');
+		}
+		if ($row->getLocalUser() !== $this->userId) {
+			throw new OCSForbiddenException();
+		}
+
+		match ($decision) {
+			'accept' => $this->accept($row),
+			'decline' => $this->decline($row),
+			default => throw new OCSBadRequestException('decision must be "accept" or "decline"'),
+		};
+
+		$row->setDecidedAt($this->timeFactory->getTime());
+		$row = $this->mapper->update($row);
+
+		return new DataResponse(['id' => $row->getId(), 'status' => $row->getStatus()]);
+	}
+
+	/**
+	 * Mutates $row to ACCEPTED on success or FAILED on any error; the
+	 * caller persists the change.
+	 */
+	private function accept(ShareRequest $row): void {
+		$localUser = $row->getLocalUser();
+		if ($localUser === null) {
+			$row->setStatus(ShareRequest::STATUS_FAILED);
+			$row->setErrorMessage('row has no resolved local user');
+			return;
+		}
+
+		try {
+			$node = $this->rootFolder->getUserFolder($localUser)->get($row->getShareRef());
+		} catch (NotFoundException) {
+			$row->setStatus(ShareRequest::STATUS_FAILED);
+			$row->setErrorMessage('resource not found');
+			return;
+		}
+
+		$share = $this->shareManager->newShare();
+		$share->setNode($node);
+		$share->setSharedBy($localUser);
+		$share->setSharedWith($row->getRequesterOcm());
+		$share->setShareType(IShare::TYPE_REMOTE);
+		$share->setPermissions(Constants::PERMISSION_READ);
+
+		try {
+			$this->shareManager->createShare($share);
+		} catch (\Throwable $e) {
+			$this->logger->warning('request-share accept failed during createShare', [
+				'id' => $row->getId(), 'exception' => $e,
+			]);
+			$row->setStatus(ShareRequest::STATUS_FAILED);
+			$row->setErrorMessage($e->getMessage());
+			return;
+		}
+
+		$row->setStatus(ShareRequest::STATUS_ACCEPTED);
+		$row->setResolvedNodeId($node->getId());
+	}
+
+	private function decline(ShareRequest $row): void {
+		$row->setStatus(ShareRequest::STATUS_DECLINED);
 	}
 
 	/**
