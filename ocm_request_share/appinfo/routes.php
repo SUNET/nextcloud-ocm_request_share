@@ -18,16 +18,11 @@ return [
 			'url' => '/api/v1/share-requests',
 			'verb' => 'POST',
 		],
-		// Local user decides on an incoming pending request.
-		[
-			'name' => 'ShareRequest#decide',
-			'url' => '/api/v1/share-requests/{id}/decision',
-			'verb' => 'POST',
-		],
 		[
 			'name' => 'ShareRequest#index',
 			'url' => '/api/v1/share-requests',
 			'verb' => 'GET',
 		],
+		// /{id}/decision lands together with the accept/decline path in task #6.
 	],
 ];
